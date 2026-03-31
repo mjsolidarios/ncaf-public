@@ -8,20 +8,19 @@ import {
 import HTMLFlipBook from 'react-pageflip'
 import { Document, Page, pdfjs } from 'react-pdf'
 import {
+  BookOpen,
   ChevronLeft,
   ChevronRight,
+  Download,
   Loader2,
+  Maximize2,
+  Minimize2,
   Minus,
   Plus,
-  ZoomIn,
 } from 'lucide-react'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 
-// Configure PDF.js worker - use react-pdf's bundled worker for version compatibility
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'react-pdf/dist/pdf.worker.entry.js',
   import.meta.url
@@ -29,36 +28,34 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const PDFPageComponent = forwardRef<
   HTMLDivElement,
-  { pageNumber: number; width: number; onRenderSuccess?: () => void }
->(({ pageNumber, width, onRenderSuccess }, ref) => {
-  return (
-    <div
-      ref={ref}
-      className="relative overflow-hidden bg-white"
-      style={{
-        boxShadow: pageNumber % 2 === 0
-          ? '-4px 0 16px rgba(56,56,49,0.08)'
-          : '4px 0 16px rgba(56,56,49,0.08)',
-      }}
-    >
-      <Page
-        pageNumber={pageNumber}
-        width={width}
-        renderAnnotationLayer
-        renderTextLayer={false}
-        onRenderSuccess={onRenderSuccess}
-        loading={
-          <div
-            className="flex items-center justify-center"
-            style={{ width, height: (width * 297) / 210 }}
-          >
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        }
-      />
-    </div>
-  )
-})
+  { pageNumber: number; width: number }
+>(({ pageNumber, width }, ref) => (
+  <div
+    ref={ref}
+    className="relative overflow-hidden bg-white"
+    style={{
+      boxShadow:
+        pageNumber % 2 === 0
+          ? '-6px 0 28px rgba(0,0,0,0.35)'
+          : '6px 0 28px rgba(0,0,0,0.35)',
+    }}
+  >
+    <Page
+      pageNumber={pageNumber}
+      width={width}
+      renderAnnotationLayer
+      renderTextLayer={false}
+      loading={
+        <div
+          className="flex items-center justify-center bg-[#f8f6f0]"
+          style={{ width, height: Math.round((width * 297) / 210) }}
+        >
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: '#406e51' }} />
+        </div>
+      }
+    />
+  </div>
+))
 PDFPageComponent.displayName = 'PDFPage'
 
 interface FlipbookViewerProps {
@@ -66,40 +63,89 @@ interface FlipbookViewerProps {
   title?: string
 }
 
-const MIN_ZOOM = 80
-const MAX_ZOOM = 150
-const DEFAULT_ZOOM = 100
+const MIN_ZOOM = 0.75
+const MAX_ZOOM = 1.5
+const ZOOM_STEP = 0.25
+const DEFAULT_ZOOM = 1
 
 export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookViewerProps) {
-  const [numPages, setNumPages] = useState<number>(0)
+  const [numPages, setNumPages] = useState(0)
   const [currentPage, setCurrentPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [basePageWidth, setBasePageWidth] = useState(400)
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isPortrait, setIsPortrait] = useState(false)
+  const [maxAvailableHeight, setMaxAvailableHeight] = useState(600)
+
   const bookRef = useRef<{
     pageFlip: () => { flipNext: () => void; flipPrev: () => void }
   }>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Responsive sizing + portrait mode detection
   useEffect(() => {
-    const updateSize = () => {
-      if (containerRef.current) {
-        const containerW = containerRef.current.offsetWidth
-        const gutter = containerW < 768 ? 32 : 88
-        const maxPageW = Math.min(Math.floor((containerW - gutter) / 2), 500)
-        setBasePageWidth(Math.max(maxPageW, 240))
+    let prevPortrait: boolean | null = null
+    const update = () => {
+      if (!containerRef.current) return
+      const w = containerRef.current.offsetWidth
+      const h = containerRef.current.offsetHeight
+      const portrait = w < 600
+      if (prevPortrait !== null && prevPortrait !== portrait) {
+        setCurrentPage(0)
+      }
+      prevPortrait = portrait
+      setIsPortrait(portrait)
+
+      // Reserve space for toolbar (52px) with padding
+      const toolbarHeight = 52
+      const availableHeight = h - toolbarHeight - 16
+      setMaxAvailableHeight(availableHeight)
+
+      if (portrait) {
+        // Small screens: fit content with more aggressive constraints
+        let width = Math.max(Math.min(w - 32, 340), 200)
+        // Further constrain if height is limited
+        const heightLimit = Math.round((width * 297) / 210)
+        if (heightLimit > availableHeight) {
+          width = Math.round((availableHeight * 210) / 297)
+        }
+        setBasePageWidth(width)
+      } else {
+        // Landscape: center spread
+        let half = Math.min(Math.floor((w - 80) / 2), 400)
+        const heightLimit = Math.round((half * 297) / 210)
+        if (heightLimit > availableHeight) {
+          half = Math.round((availableHeight * 210) / 297)
+        }
+        setBasePageWidth(Math.max(half, 240))
       }
     }
-
-    updateSize()
-    const ro = new ResizeObserver(updateSize)
+    update()
+    const ro = new ResizeObserver(update)
     if (containerRef.current) ro.observe(containerRef.current)
     return () => ro.disconnect()
   }, [])
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages)
+  // Fullscreen API
+  useEffect(() => {
+    const onFSChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFSChange)
+    return () => document.removeEventListener('fullscreenchange', onFSChange)
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  const onDocumentLoadSuccess = useCallback(({ numPages: n }: { numPages: number }) => {
+    setNumPages(n)
     setLoading(false)
     setLoadError(false)
   }, [])
@@ -109,216 +155,263 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
     setLoadError(true)
   }, [])
 
-  const goNext = useCallback(() => {
-    bookRef.current?.pageFlip().flipNext()
-  }, [])
-
-  const goPrev = useCallback(() => {
-    bookRef.current?.pageFlip().flipPrev()
-  }, [])
-
-  const onFlip = useCallback((e: { data: number }) => {
-    setCurrentPage(e.data)
-  }, [])
-
-  const handleZoomChange = useCallback((nextZoom: number[]) => {
-    const [value = DEFAULT_ZOOM] = nextZoom
-    setZoom(value)
-  }, [])
+  const goNext = useCallback(() => bookRef.current?.pageFlip().flipNext(), [])
+  const goPrev = useCallback(() => bookRef.current?.pageFlip().flipPrev(), [])
+  const onFlip = useCallback((e: { data: number }) => setCurrentPage(e.data), [])
 
   const updateZoomBy = useCallback((delta: number) => {
-    setZoom((current) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, current + delta)))
+    setZoom((c) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, c + delta)))
   }, [])
 
+  // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
         e.preventDefault()
-        updateZoomBy(10)
+        updateZoomBy(ZOOM_STEP)
       } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
         e.preventDefault()
-        updateZoomBy(-10)
+        updateZoomBy(-ZOOM_STEP)
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault()
         goNext()
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
         goPrev()
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen()
       }
     }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goNext, goPrev, updateZoomBy, toggleFullscreen])
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goNext, goPrev, updateZoomBy])
-
-  const pageWidth = Math.round(basePageWidth * (zoom / 100))
+  const pageWidth = basePageWidth
   const pageHeight = Math.round((pageWidth * 297) / 210)
+  const scaleTransform = zoom
+  const displayZoom = Math.round(zoom * 100)
   const canGoPrev = currentPage === 0
-  const canGoNext = currentPage >= numPages - 2
-  const currentSpreadStart = Math.min(currentPage + 1, Math.max(numPages, 1))
-  const currentSpreadEnd = Math.min(currentPage + 2, Math.max(numPages, 1))
+  const canGoNext = numPages > 0 && currentPage >= numPages - (isPortrait ? 1 : 2)
+  const pageStart = numPages > 0 ? currentPage + 1 : 0
+  const pageEnd = isPortrait ? pageStart : Math.min(currentPage + 2, numPages)
 
   return (
-    <div ref={containerRef} className="w-full">
-      <div className="mb-4 flex flex-col gap-4 rounded-[1.75rem] border border-outline-variant/70 bg-white/80 p-4 shadow-ambient backdrop-blur-sm md:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="default">{title}</Badge>
-              <Badge variant="outline">
-                {numPages > 0
-                  ? `Pages ${currentSpreadStart}-${currentSpreadEnd} of ${numPages}`
-                  : 'Preparing document'}
-              </Badge>
-            </div>
-
-            <p className="font-body text-sm leading-6 text-on-surface-variant">
-              Flip with the arrow controls or keyboard, then zoom in for a closer read.
-            </p>
+    <div
+      ref={containerRef}
+      className={cn(
+        'group relative flex h-full w-full flex-col',
+        isFullscreen && 'bg-[#1a1815]'
+      )}
+    >
+      {/* ── Book stage ─────────────────────────────────────────── */}
+      <div
+        className="relative flex flex-1 items-center justify-center overflow-hidden"
+        style={{
+          background: 'linear-gradient(180deg, #1a1815 0%, #252219 50%, #1a1815 100%)',
+          paddingTop: 28,
+          paddingBottom: 28,
+        }}
+      >
+        {/* Loading / error overlay */}
+        {(loading || loadError) && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4">
+            {loading && !loadError ? (
+              <>
+                <div className="relative flex h-14 w-14 items-center justify-center">
+                  <BookOpen
+                    className="h-7 w-7"
+                    style={{ color: 'rgba(254,252,241,0.18)' }}
+                  />
+                  <Loader2
+                    className="absolute inset-0 h-14 w-14 animate-spin"
+                    style={{ color: '#c8e6ca' }}
+                  />
+                </div>
+                <p className="font-body text-sm" style={{ color: 'rgba(254,252,241,0.5)' }}>
+                  Loading {title}…
+                </p>
+              </>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 px-6 py-5 text-center backdrop-blur-md">
+                <p className="font-body text-sm" style={{ color: 'rgba(254,252,241,0.7)' }}>
+                  No PDF file found. Place it at{' '}
+                  <code className="rounded bg-white/10 px-1 font-mono text-xs">
+                    /NCAF_Program.pdf
+                  </code>
+                </p>
+              </div>
+            )}
           </div>
+        )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              size="icon"
-              variant="glass"
-              onClick={() => updateZoomBy(-10)}
-              disabled={zoom <= MIN_ZOOM}
-              aria-label="Zoom out"
+        {/* Side nav arrows — always visible on mobile, fade-in on desktop hover */}
+        <button
+          onClick={goPrev}
+          disabled={canGoPrev}
+          aria-label="Previous page"
+          className={cn(
+            'absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full',
+            'bg-white/10 text-white backdrop-blur-sm',
+            'transition-all duration-200 hover:scale-105 hover:bg-white/20',
+            'disabled:pointer-events-none disabled:opacity-20',
+            'opacity-100 md:opacity-0 md:group-hover:opacity-100',
+          )}
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <button
+          onClick={goNext}
+          disabled={canGoNext}
+          aria-label="Next page"
+          className={cn(
+            'absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full',
+            'bg-white/10 text-white backdrop-blur-sm',
+            'transition-all duration-200 hover:scale-105 hover:bg-white/20',
+            'disabled:pointer-events-none disabled:opacity-20',
+            'opacity-100 md:opacity-0 md:group-hover:opacity-100',
+          )}
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+
+        {/* Flipbook */}
+        <Document
+          file={pdfUrl}
+          onLoadSuccess={onDocumentLoadSuccess}
+          onLoadError={onDocumentLoadError}
+          loading={null}
+          error={null}
+        >
+          {numPages > 0 && (
+            // @ts-expect-error react-pageflip lacks full TS definitions
+            <HTMLFlipBook
+              key={isPortrait ? 'portrait' : 'landscape'}
+              ref={bookRef}
+              width={pageWidth}
+              height={pageHeight}
+              size="fixed"
+              minWidth={200}
+              maxWidth={800}
+              minHeight={280}
+              maxHeight={1200}
+              drawShadow
+              flippingTime={700}
+              usePortrait={isPortrait}
+              startZIndex={20}
+              autoSize={false}
+              maxShadowOpacity={0.6}
+              showCover
+              mobileScrollSupport
+              useMouseEvents
+              showPageCorners={!isPortrait}
+              className="shadow-[0_32px_80px_rgba(0,0,0,0.55)]"
+              onFlip={onFlip}
+              style={{}}
             >
-              <Minus className="h-4 w-4" />
-            </Button>
-
-            <div className="min-w-28 rounded-full bg-surface-container-low px-4 py-2 text-center font-body text-sm font-semibold text-on-surface">
-              {zoom}%
-            </div>
-
-            <Button
-              type="button"
-              size="icon"
-              variant="glass"
-              onClick={() => updateZoomBy(10)}
-              disabled={zoom >= MAX_ZOOM}
-              aria-label="Zoom in"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <ZoomIn className="h-4 w-4 shrink-0 text-primary" />
-            <Slider
-              aria-label="Zoom level"
-              min={MIN_ZOOM}
-              max={MAX_ZOOM}
-              step={10}
-              value={[zoom]}
-              onValueChange={handleZoomChange}
-              className="flex-1"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-            <Button
-              type="button"
-              variant="glass"
-              onClick={goPrev}
-              disabled={canGoPrev}
-              className="min-w-28"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-
-            <Button
-              type="button"
-              variant="primary"
-              onClick={goNext}
-              disabled={canGoNext}
-              className="min-w-28"
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+              {Array.from({ length: numPages }, (_, i) => (
+                <PDFPageComponent key={i + 1} pageNumber={i + 1} width={pageWidth} />
+              ))}
+            </HTMLFlipBook>
+          )}
+        </Document>
       </div>
 
-      <div className="relative overflow-x-auto rounded-[1.75rem] border border-outline-variant/60 bg-[linear-gradient(180deg,rgba(255,253,245,0.96),rgba(246,243,231,0.98))]">
-        <div
-          className="relative mx-auto flex min-w-max items-center justify-center px-4 py-5 md:px-8"
-          style={{ minWidth: pageWidth * 2 + 48, minHeight: pageHeight + 24 }}
-        >
-          {(loading || loadError) && (
-            <div
-              className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 rounded-[1.5rem]"
-              style={{
-                background: '#fffdf5',
-                minWidth: pageWidth * 2 + 48,
-                minHeight: pageHeight + 24,
-              }}
-            >
-              {loading && !loadError ? (
-                <>
-                  <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#406e51' }} />
-                  <p className="font-body text-sm" style={{ color: '#5c5b52' }}>
-                    Loading {title}…
-                  </p>
-                </>
-              ) : (
-                <p className="px-6 text-center font-body text-sm" style={{ color: '#5c5b52' }}>
-                  Unable to load the PDF file.
-                </p>
-              )}
-            </div>
-          )}
+      {/* ── Bottom toolbar ──────────────────────────────────────── */}
+      <div className="flex h-[52px] items-center justify-between gap-2 border-t border-white/10 bg-[rgba(14,12,9,0.90)] px-3 backdrop-blur-md">
 
-          <Document
-            file={pdfUrl}
-            onLoadSuccess={onDocumentLoadSuccess}
-            onLoadError={onDocumentLoadError}
-            loading={null}
-            error={null}
+        {/* Left: prev / page counter / next */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={goPrev}
+            disabled={canGoPrev}
+            aria-label="Previous page"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
           >
-            {numPages > 0 && (
-              // @ts-expect-error react-pageflip lacks full TS definitions
-              <HTMLFlipBook
-                ref={bookRef}
-                width={pageWidth}
-                height={pageHeight}
-                size="fixed"
-                minWidth={200}
-                maxWidth={760}
-                minHeight={280}
-                maxHeight={1200}
-                drawShadow
-                flippingTime={800}
-                usePortrait={false}
-                startZIndex={20}
-                autoSize={false}
-                maxShadowOpacity={0.4}
-                showCover
-                mobileScrollSupport
-                useMouseEvents
-                showPageCorners
-                className={cn(
-                  'overflow-hidden rounded-xl shadow-float transition-[box-shadow] duration-300'
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <div className="flex min-w-[5rem] items-center justify-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1 font-body text-xs text-white/75">
+            {numPages > 0 ? (
+              <>
+                <span className="font-semibold text-white">{pageStart}</span>
+                {!isPortrait && pageEnd !== pageStart && (
+                  <>
+                    <span className="mx-0.5 text-white/30">–</span>
+                    <span className="font-semibold text-white">{pageEnd}</span>
+                  </>
                 )}
-                onFlip={onFlip}
-                style={{}}
-              >
-                {Array.from({ length: numPages }, (_, i) => (
-                  <PDFPageComponent
-                    key={i + 1}
-                    pageNumber={i + 1}
-                    width={pageWidth}
-                  />
-                ))}
-              </HTMLFlipBook>
+                <span className="mx-1 text-white/30">/</span>
+                <span>{numPages}</span>
+              </>
+            ) : (
+              <span className="text-white/30">— / —</span>
             )}
-          </Document>
+          </div>
+
+          <button
+            onClick={goNext}
+            disabled={canGoNext}
+            aria-label="Next page"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Center: title (hidden on xs) */}
+        <p className="hidden min-w-0 flex-1 truncate px-2 text-center font-body text-xs text-white/35 sm:block">
+          {title}
+        </p>
+
+        {/* Right: zoom + fullscreen + download */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => updateZoomBy(-ZOOM_STEP)}
+            disabled={zoom <= MIN_ZOOM}
+            aria-label="Zoom out"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+
+          <span className="min-w-[2.75rem] rounded-full bg-white/10 px-2 py-1 text-center font-body text-xs text-white/75">
+            {zoom}%
+          </span>
+
+          <button
+            onClick={() => updateZoomBy(ZOOM_STEP)}
+            disabled={zoom >= MAX_ZOOM}
+            aria-label="Zoom in"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="mx-1 h-4 w-px bg-white/20" />
+
+          <button
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          <div className="mx-1 h-4 w-px bg-white/20" />
+
+          <a
+            href={pdfUrl}
+            download
+            aria-label="Download PDF"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </a>
         </div>
       </div>
     </div>
