@@ -1,114 +1,76 @@
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Download, Sparkles } from 'lucide-react'
 import { FlipbookViewer } from './flipbook/FlipbookViewer'
-import { Download } from 'lucide-react'
 
-// Update this path to point to your actual PDF
-const PROGRAM_PDF_URL = '/program.pdf'
+const PROGRAM_PDF_URL = '/NCAF_Program.pdf'
 
 export function ProgramSection() {
   return (
     <section
       id="program"
-      className="relative py-24 overflow-hidden"
+      className="min-h-screen py-8 md:py-12"
       style={{ background: '#f6f3e7' }}
     >
-      {/* Top organic curve */}
-      <div
-        className="absolute top-0 left-0 right-0 h-20 pointer-events-none"
-        style={{
-          background: '#fefcf1',
-          clipPath: 'ellipse(70% 100% at 50% 0%)',
-        }}
-      />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <span
-            className="inline-block px-4 py-1.5 rounded-full font-body text-sm font-semibold mb-4"
-            style={{ background: '#ffdcc2', color: '#7a3d00' }}
-          >
-            Official Program
-          </span>
-          <h2
-            className="font-display font-bold mb-4"
-            style={{
-              fontSize: 'clamp(1.75rem, 5vw, 3rem)',
-              color: '#383831',
-              letterSpacing: '0.03em',
-              lineHeight: 1.2,
-            }}
-          >
-            Festival Program
-          </h2>
-          <p
-            className="font-body text-base leading-relaxed max-w-xl mx-auto mb-8"
-            style={{ color: '#5c5b52' }}
-          >
-            Browse through the complete festival program. Flip through the pages
-            just like a real book — or download a copy for offline reading.
-          </p>
-
-          <a
-            href={PROGRAM_PDF_URL}
-            download
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-body font-semibold text-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-float"
-            style={{
-              background: 'linear-gradient(135deg, #9c5000, #c06a14)',
-              color: '#ffffff',
-              boxShadow: '0 8px 24px rgba(156,80,0,0.25)',
-            }}
-          >
-            <Download className="w-4 h-4" />
-            Download PDF
-          </a>
-        </div>
-
-        {/* Flipbook container */}
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4">
         <div
-          id="flipbook"
-          className="relative rounded-3xl p-6 md:p-10"
+          className="overflow-hidden rounded-[2rem] border border-outline-variant/60 p-6 md:p-8"
           style={{
-            background: 'rgba(254,252,241,0.8)',
-            backdropFilter: 'blur(20px)',
-            boxShadow: '0 24px 80px rgba(56,56,49,0.08)',
+            background: 'linear-gradient(135deg, rgba(255,253,245,0.98), rgba(246,243,231,0.92))',
+            boxShadow: '0 24px 60px rgba(56,56,49,0.08)',
           }}
         >
-          {/* Decorative elements */}
-          <div
-            className="absolute -top-6 -right-6 w-32 h-32 rounded-full opacity-30 blur-2xl pointer-events-none"
-            style={{ background: '#834aae' }}
-          />
-          <div
-            className="absolute -bottom-6 -left-6 w-40 h-40 rounded-full opacity-20 blur-2xl pointer-events-none"
-            style={{ background: '#9c5000' }}
-          />
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl">
+              <Badge className="mb-4 gap-2" variant="outline">
+                <Sparkles className="h-3.5 w-3.5" />
+                Interactive Festival Program
+              </Badge>
 
+              <h2
+                className="font-display text-3xl font-bold tracking-[0.03em] md:text-4xl"
+                style={{ color: '#383831' }}
+              >
+                Browse the NCAF 2026 program like a keepsake booklet.
+              </h2>
+
+              <p
+                className="mt-3 max-w-xl font-body text-sm leading-7 md:text-base"
+                style={{ color: '#5c5b52' }}
+              >
+                Flip through each spread, use the updated controls, and zoom in when you
+                want a closer look at schedules, features, and festival details.
+              </p>
+            </div>
+
+            <Button
+              asChild
+              className="w-full sm:w-auto"
+              size="md"
+              variant="primary"
+            >
+              <a
+                href={PROGRAM_PDF_URL}
+                download
+              >
+                <Download className="h-4 w-4" />
+                Download PDF
+              </a>
+            </Button>
+          </div>
+        </div>
+
+        <div
+          id="flipbook"
+          className="rounded-[2rem] border border-outline-variant/60 p-3 md:p-4"
+          style={{
+            background: '#fefcf1',
+            boxShadow: '0 18px 50px rgba(56,56,49,0.08)',
+          }}
+        >
           <FlipbookViewer pdfUrl={PROGRAM_PDF_URL} title="NCAF 2026 Festival Program" />
         </div>
-
-        {/* Instructions */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6">
-          {[
-            { icon: '👆', label: 'Click page corner to flip' },
-            { icon: '⌨️', label: 'Use arrow keys' },
-            { icon: '📱', label: 'Swipe on mobile' },
-          ].map((hint, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="text-xl">{hint.icon}</span>
-              <span className="font-body text-sm" style={{ color: '#5c5b52' }}>{hint.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
-
-      {/* Bottom organic curve */}
-      <div
-        className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
-        style={{
-          background: '#fefcf1',
-          clipPath: 'ellipse(70% 100% at 50% 100%)',
-        }}
-      />
     </section>
   )
 }
