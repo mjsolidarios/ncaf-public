@@ -541,7 +541,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             <Minus className="h-3.5 w-3.5" />
           </button>
 
-          <div className="w-16 px-1 sm:w-24">
+          <div className="hidden w-16 px-1 sm:block sm:w-24">
             <Slider
               aria-label="Zoom level"
               min={MIN_ZOOM}
@@ -569,12 +569,12 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
           <button
             onClick={() => updateZoomTo(DEFAULT_ZOOM)}
             aria-label="Fit to screen"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="hidden h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:flex"
           >
             <Expand className="h-3.5 w-3.5" />
           </button>
 
-          <div className="mx-1 h-4 w-px bg-white/20" />
+          <div className="mx-1 hidden h-4 w-px bg-white/20 sm:block" />
 
           <button
             onClick={toggleFullscreen}
@@ -588,7 +588,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             )}
           </button>
 
-          <div className="mx-1 h-4 w-px bg-white/20" />
+          <div className="mx-1 hidden h-4 w-px bg-white/20 sm:block" />
 
           <a
             href={pdfUrl}
