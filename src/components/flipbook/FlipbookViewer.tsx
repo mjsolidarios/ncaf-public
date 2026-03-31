@@ -1,9 +1,11 @@
 import {
+  memo,
   useState,
   useRef,
   useCallback,
   forwardRef,
   useEffect,
+  useMemo,
 } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -17,19 +19,27 @@ import {
   Minimize2,
   Minus,
   Plus,
+  Expand,
 } from 'lucide-react'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import { cn } from '@/lib/utils'
+import { Slider } from '@/components/ui/slider'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'react-pdf/dist/pdf.worker.entry.js',
   import.meta.url
 ).toString()
 
-const PDFPageComponent = forwardRef<
+const PDFPageComponent = memo(forwardRef<
   HTMLDivElement,
-  { pageNumber: number; width: number }
->(({ pageNumber, width }, ref) => (
+  { pageNumber: number; width: number; zoom: number }
+>(({ pageNumber, width, zoom }, ref) => {
+  const renderDevicePixelRatio = Math.min(
+    MAX_RENDER_DEVICE_PIXEL_RATIO,
+    (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) * zoom
+  )
+
+  return (
   <div
     ref={ref}
     className="relative overflow-hidden bg-white"
@@ -43,6 +53,7 @@ const PDFPageComponent = forwardRef<
     <Page
       pageNumber={pageNumber}
       width={width}
+      devicePixelRatio={renderDevicePixelRatio}
       renderAnnotationLayer
       renderTextLayer={false}
       loading={
@@ -55,6 +66,11 @@ const PDFPageComponent = forwardRef<
       }
     />
   </div>
+  )
+}), (prevProps, nextProps) => (
+  prevProps.pageNumber === nextProps.pageNumber &&
+  prevProps.width === nextProps.width &&
+  prevProps.zoom === nextProps.zoom
 ))
 PDFPageComponent.displayName = 'PDFPage'
 
@@ -63,10 +79,11 @@ interface FlipbookViewerProps {
   title?: string
 }
 
-const MIN_ZOOM = 0.75
-const MAX_ZOOM = 1.5
-const ZOOM_STEP = 0.25
+const MIN_ZOOM = 0.6
+const MAX_ZOOM = 3
+const ZOOM_STEP = 0.1
 const DEFAULT_ZOOM = 1
+const MAX_RENDER_DEVICE_PIXEL_RATIO = 5
 
 export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookViewerProps) {
   const [numPages, setNumPages] = useState(0)
@@ -77,7 +94,6 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
-  const [maxAvailableHeight, setMaxAvailableHeight] = useState(600)
 
   const bookRef = useRef<{
     pageFlip: () => { flipNext: () => void; flipPrev: () => void }
@@ -98,27 +114,22 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
       prevPortrait = portrait
       setIsPortrait(portrait)
 
-      // Reserve space for toolbar (52px) with padding
+      // Reserve space for toolbar and the stage's vertical padding
       const toolbarHeight = 52
-      const availableHeight = h - toolbarHeight - 16
-      setMaxAvailableHeight(availableHeight)
+      const stagePaddingY = portrait ? 20 : 28
+      const availableHeight = h - toolbarHeight - stagePaddingY * 2 - 24
 
       if (portrait) {
-        // Small screens: fit content with more aggressive constraints
-        let width = Math.max(Math.min(w - 32, 340), 200)
-        // Further constrain if height is limited
-        const heightLimit = Math.round((width * 297) / 210)
-        if (heightLimit > availableHeight) {
-          width = Math.round((availableHeight * 210) / 297)
-        }
+        // Small screens: force full-page visibility in the stage.
+        const maxByWidth = Math.floor(w - 28)
+        const maxByHeight = Math.floor((availableHeight * 210) / 297)
+        const width = Math.max(Math.min(maxByWidth, maxByHeight, 320), 170)
         setBasePageWidth(width)
       } else {
         // Landscape: center spread
-        let half = Math.min(Math.floor((w - 80) / 2), 400)
-        const heightLimit = Math.round((half * 297) / 210)
-        if (heightLimit > availableHeight) {
-          half = Math.round((availableHeight * 210) / 297)
-        }
+        const maxHalfByWidth = Math.floor((w - 96) / 2)
+        const maxHalfByHeight = Math.floor((availableHeight * 210) / 297)
+        const half = Math.min(maxHalfByWidth, maxHalfByHeight, 400)
         setBasePageWidth(Math.max(half, 240))
       }
     }
@@ -163,6 +174,16 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
     setZoom((c) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, c + delta)))
   }, [])
 
+  const updateZoomTo = useCallback((next: number) => {
+    setZoom(Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, next)))
+  }, [])
+
+  const onStageWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    // Always zoom on scroll, no modifier required
+    updateZoomBy(-e.deltaY * 0.0015)
+  }, [updateZoomBy])
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,7 +209,12 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
 
   const pageWidth = basePageWidth
   const pageHeight = Math.round((pageWidth * 297) / 210)
-  const scaleTransform = zoom
+  const renderedPages = useMemo(
+    () => Array.from({ length: numPages }, (_, i) => (
+      <PDFPageComponent key={i + 1} pageNumber={i + 1} width={pageWidth} zoom={zoom} />
+    )),
+    [numPages, pageWidth, zoom]
+  )
   const displayZoom = Math.round(zoom * 100)
   const canGoPrev = currentPage === 0
   const canGoNext = numPages > 0 && currentPage >= numPages - (isPortrait ? 1 : 2)
@@ -206,10 +232,11 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
       {/* ── Book stage ─────────────────────────────────────────── */}
       <div
         className="relative flex flex-1 items-center justify-center overflow-hidden"
+        onWheel={onStageWheel}
         style={{
           background: 'linear-gradient(180deg, #1a1815 0%, #252219 50%, #1a1815 100%)',
-          paddingTop: 28,
-          paddingBottom: 28,
+          paddingTop: isPortrait ? 20 : 28,
+          paddingBottom: isPortrait ? 20 : 28,
         }}
       >
         {/* Loading / error overlay */}
@@ -276,49 +303,56 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
         </button>
 
         {/* Flipbook */}
-        <Document
-          file={pdfUrl}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading={null}
-          error={null}
+        <div
+          style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: 'center',
+            transition: 'transform 0.2s ease-out',
+            willChange: 'transform',
+          }}
         >
-          {numPages > 0 && (
-            // @ts-expect-error react-pageflip lacks full TS definitions
-            <HTMLFlipBook
-              key={isPortrait ? 'portrait' : 'landscape'}
-              ref={bookRef}
-              width={pageWidth}
-              height={pageHeight}
-              size="fixed"
-              minWidth={200}
-              maxWidth={800}
-              minHeight={280}
-              maxHeight={1200}
-              drawShadow
-              flippingTime={700}
-              usePortrait={isPortrait}
-              startZIndex={20}
-              autoSize={false}
-              maxShadowOpacity={0.6}
-              showCover
-              mobileScrollSupport
-              useMouseEvents
-              showPageCorners={!isPortrait}
-              className="shadow-[0_32px_80px_rgba(0,0,0,0.55)]"
-              onFlip={onFlip}
-              style={{}}
-            >
-              {Array.from({ length: numPages }, (_, i) => (
-                <PDFPageComponent key={i + 1} pageNumber={i + 1} width={pageWidth} />
-              ))}
-            </HTMLFlipBook>
-          )}
-        </Document>
+          <Document
+            file={pdfUrl}
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+            loading={null}
+            error={null}
+          >
+            {numPages > 0 && (
+              // @ts-expect-error react-pageflip lacks full TS definitions
+              <HTMLFlipBook
+                key={isPortrait ? 'portrait' : 'landscape'}
+                ref={bookRef}
+                width={pageWidth}
+                height={pageHeight}
+                size="fixed"
+                minWidth={200}
+                maxWidth={800}
+                minHeight={280}
+                maxHeight={1200}
+                drawShadow
+                flippingTime={700}
+                usePortrait={isPortrait}
+                startZIndex={20}
+                autoSize={false}
+                maxShadowOpacity={0.6}
+                showCover
+                mobileScrollSupport
+                useMouseEvents
+                showPageCorners={!isPortrait}
+                className="shadow-[0_32px_80px_rgba(0,0,0,0.55)]"
+                onFlip={onFlip}
+                style={{}}
+              >
+                {renderedPages}
+              </HTMLFlipBook>
+            )}
+          </Document>
+        </div>
       </div>
 
       {/* ── Bottom toolbar ──────────────────────────────────────── */}
-      <div className="flex h-[52px] items-center justify-between gap-2 border-t border-white/10 bg-[rgba(14,12,9,0.90)] px-3 backdrop-blur-md">
+      <div className="flex h-13 items-center justify-between gap-2 border-t border-white/10 bg-[rgba(14,12,9,0.90)] px-3 backdrop-blur-md">
 
         {/* Left: prev / page counter / next */}
         <div className="flex items-center gap-1">
@@ -331,7 +365,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             <ChevronLeft className="h-4 w-4" />
           </button>
 
-          <div className="flex min-w-[5rem] items-center justify-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1 font-body text-xs text-white/75">
+          <div className="flex min-w-20 items-center justify-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1 font-body text-xs text-white/75">
             {numPages > 0 ? (
               <>
                 <span className="font-semibold text-white">{pageStart}</span>
@@ -375,8 +409,20 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             <Minus className="h-3.5 w-3.5" />
           </button>
 
-          <span className="min-w-[2.75rem] rounded-full bg-white/10 px-2 py-1 text-center font-body text-xs text-white/75">
-            {zoom}%
+          <div className="w-16 px-1 sm:w-24">
+            <Slider
+              aria-label="Zoom level"
+              min={MIN_ZOOM}
+              max={MAX_ZOOM}
+              step={0.01}
+              value={[zoom]}
+              onValueChange={(v) => updateZoomTo(v[0] ?? DEFAULT_ZOOM)}
+              className=""
+            />
+          </div>
+
+          <span className="min-w-11 rounded-full bg-white/10 px-2 py-1 text-center font-body text-xs text-white/75">
+            {displayZoom}%
           </span>
 
           <button
@@ -386,6 +432,14 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-25"
           >
             <Plus className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            onClick={() => updateZoomTo(DEFAULT_ZOOM)}
+            aria-label="Fit to screen"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Expand className="h-3.5 w-3.5" />
           </button>
 
           <div className="mx-1 h-4 w-px bg-white/20" />
