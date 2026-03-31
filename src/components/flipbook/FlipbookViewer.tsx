@@ -75,7 +75,6 @@ const MIN_ZOOM = 0.6
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.1
 const DEFAULT_ZOOM = 1
-const LARGE_SCREEN_INITIAL_ZOOM = 1.45
 const MAX_RENDER_DEVICE_PIXEL_RATIO = 5
 
 export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookViewerProps) {
@@ -84,11 +83,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [basePageWidth, setBasePageWidth] = useState(400)
-  const [zoom, setZoom] = useState(() =>
-    typeof window !== 'undefined' && window.innerWidth >= 600
-      ? LARGE_SCREEN_INITIAL_ZOOM
-      : DEFAULT_ZOOM
-  )
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
@@ -109,14 +104,28 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   // Responsive sizing + portrait mode detection
   useEffect(() => {
     let prevPortrait: boolean | null = null
+    let initialized = false
+    const fitZoom = (portrait: boolean, w: number, h: number) => {
+      if (portrait) return DEFAULT_ZOOM
+      const toolbarHeight = 52
+      const stagePaddingY = 28
+      const availableHeight = h - toolbarHeight - stagePaddingY * 2 - 24
+      const maxHalfByWidth = Math.floor((w - 96) / 2)
+      const maxHalfByHeight = Math.floor((availableHeight * 210) / 297)
+      const natural = Math.min(maxHalfByWidth, maxHalfByHeight) / 400
+      return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, natural))
+    }
     const update = () => {
       if (!containerRef.current) return
       const w = containerRef.current.offsetWidth
       const h = containerRef.current.offsetHeight
       const portrait = w < 600
-      if (prevPortrait !== null && prevPortrait !== portrait) {
+      if (!initialized) {
+        initialized = true
+        setZoom(fitZoom(portrait, w, h))
+      } else if (prevPortrait !== null && prevPortrait !== portrait) {
         setCurrentPage(0)
-        setZoom(portrait ? DEFAULT_ZOOM : LARGE_SCREEN_INITIAL_ZOOM)
+        setZoom(fitZoom(portrait, w, h))
       }
       prevPortrait = portrait
       setIsPortrait(portrait)
@@ -417,18 +426,6 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             willChange: 'transform',
           }}
         >
-          {/* Spine shadow — controlled by React state, disappears instantly on cover view */}
-          {!isSingleCoverView && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-1/2 z-[25] -translate-x-1/2"
-              style={{
-                width: 56,
-                background:
-                  'linear-gradient(to right, rgba(0,0,0,0.22) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.22) 100%)',
-              }}
-            />
-          )}
           <Document
             file={pdfUrl}
             onLoadSuccess={onDocumentLoadSuccess}
