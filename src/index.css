@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* Cultural Tapestry Design System Tokens */
+@theme {
+  /* Color Palette */
+  --color-primary: #406e51;
+  --color-primary-container: #c8e6ca;
+  --color-on-primary: #ffffff;
+  --color-secondary: #9c5000;
+  --color-secondary-container: #ffdcc2;
+  --color-on-secondary: #ffffff;
+  --color-tertiary: #834aae;
+  --color-tertiary-container: #f3daff;
+  --color-on-tertiary: #ffffff;
+  --color-surface: #fefcf1;
+  --color-surface-container-lowest: #fffdf5;
+  --color-surface-container-low: #f6f3e7;
+  --color-surface-container: #ede9dd;
+  --color-surface-container-high: #e4e0d4;
+  --color-on-surface: #383831;
+  --color-on-surface-variant: #5c5b52;
+  --color-outline-variant: rgba(92, 91, 82, 0.15);
+  --color-error: #ba1a1a;
+
+  /* Typography */
+  --font-display: 'Noto Serif', Georgia, serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* Type Scale */
+  --text-display-lg: 3.5rem;
+  --text-display-md: 2.8rem;
+  --text-display-sm: 2.25rem;
+  --text-headline-lg: 2rem;
+  --text-headline-md: 1.75rem;
+  --text-headline-sm: 1.5rem;
+  --text-title-lg: 1.25rem;
+  --text-body-lg: 1rem;
+  --text-body-md: 0.875rem;
+  --text-label: 0.75rem;
+
+  /* Letter Spacing */
+  --tracking-display: 0.05em;
+  --tracking-headline: 0.03em;
+
+  /* Spacing */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+
+  /* Border Radius */
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-full: 9999px;
+
+  /* Shadows (Ambient) */
+  --shadow-ambient: 0 8px 32px 0 rgba(56, 56, 49, 0.04);
+  --shadow-float: 0 16px 48px 0 rgba(56, 56, 49, 0.08);
+}
+
+/* Base styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  color: #383831;
+  background-color: #fefcf1;
+  scroll-behavior: smooth;
+}
+
+/* Custom utility classes */
+.font-display {
+  font-family: 'Noto Serif', Georgia, serif;
+}
+
+.font-body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(254, 252, 241, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Organic curve mask */
+.curve-bottom {
+  clip-path: ellipse(100% 100% at 50% 0%);
+}
+
+.curve-top {
+  clip-path: ellipse(100% 85% at 50% 100%);
+}
+
+/* Float animation */
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float-up {
+  animation: float-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float-up-delay-1 {
+  opacity: 0;
+  animation: float-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+}
+
+.animate-float-up-delay-2 {
+  opacity: 0;
+  animation: float-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+}
+
+.animate-float-up-delay-3 {
+  opacity: 0;
+  animation: float-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+}
+
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+/* Page flip shadow */
+.page-shadow {
+  box-shadow: -8px 0 20px rgba(56, 56, 49, 0.12);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f6f3e7;
+}
+::-webkit-scrollbar-thumb {
+  background: #406e51;
+  border-radius: 3px;
+}
