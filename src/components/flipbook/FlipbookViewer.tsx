@@ -90,6 +90,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const [isPanning, setIsPanning] = useState(false)
   const panRef = useRef({ x: 0, y: 0 })
   const zoomRef = useRef(zoom)
+  const fitZoomRef = useRef(DEFAULT_ZOOM)
   const dragRef = useRef<{
     startX: number; startY: number
     startPanX: number; startPanY: number
@@ -113,7 +114,9 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
       const maxHalfByWidth = Math.floor((w - 96) / 2)
       const maxHalfByHeight = Math.floor((availableHeight * 210) / 297)
       const natural = Math.min(maxHalfByWidth, maxHalfByHeight) / 400
-      return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, natural))
+      const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, natural))
+      fitZoomRef.current = z
+      return z
     }
     const update = () => {
       if (!containerRef.current) return
@@ -174,9 +177,9 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   // Keep zoomRef in sync for use inside stable event handlers
   useEffect(() => { zoomRef.current = zoom }, [zoom])
 
-  // Reset pan when zoom returns to/below 1
+  // Reset pan when zoom returns to/below the fit zoom
   useEffect(() => {
-    if (zoom <= 1) {
+    if (zoom <= fitZoomRef.current) {
       panRef.current = { x: 0, y: 0 }
       setPanOffset({ x: 0, y: 0 })
     }
@@ -222,7 +225,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   }, [])
 
   const onPanStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (zoomRef.current <= 1) return
+    if (zoomRef.current <= fitZoomRef.current) return
     let clientX: number, clientY: number
     if ('touches' in e) {
       if (e.touches.length !== 1) return
@@ -472,8 +475,8 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
         <div
           className="absolute inset-0 z-[15]"
           style={{
-            pointerEvents: zoom > 1 ? 'auto' : 'none',
-            cursor: isPanning ? 'grabbing' : zoom > 1 ? 'grab' : 'default',
+            pointerEvents: zoom > fitZoomRef.current ? 'auto' : 'none',
+            cursor: isPanning ? 'grabbing' : zoom > fitZoomRef.current ? 'grab' : 'default',
           }}
           onMouseDown={onPanStart}
           onTouchStart={onPanStart}
