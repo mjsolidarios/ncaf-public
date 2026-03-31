@@ -261,38 +261,14 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
           className="pointer-events-none absolute inset-0 opacity-20"
           style={{
             backgroundImage: [
-              'repeating-linear-gradient(45deg, rgba(226, 179, 72, 0.16) 0 2px, transparent 2px 20px)',
-              'repeating-linear-gradient(-45deg, rgba(86, 145, 116, 0.12) 0 2px, transparent 2px 20px)',
-              'radial-gradient(circle at 18% 22%, rgba(248, 220, 142, 0.12) 0 10%, transparent 10% 100%)',
-              'radial-gradient(circle at 82% 78%, rgba(179, 113, 42, 0.1) 0 10%, transparent 10% 100%)',
+              'repeating-linear-gradient(0deg, rgba(230, 197, 118, 0.2) 0 14px, rgba(179, 122, 46, 0.14) 14px 28px)',
+              'repeating-linear-gradient(90deg, rgba(244, 218, 152, 0.16) 0 14px, rgba(92, 140, 104, 0.12) 14px 28px)',
+              'repeating-linear-gradient(0deg, transparent 0 27px, rgba(255, 246, 214, 0.16) 27px 29px)',
+              'repeating-linear-gradient(90deg, transparent 0 27px, rgba(66, 48, 21, 0.12) 27px 29px)',
+              'linear-gradient(135deg, rgba(245, 231, 188, 0.08), rgba(122, 82, 32, 0.06))',
             ].join(', '),
-            backgroundSize: '48px 48px, 48px 48px, 220px 220px, 260px 260px',
-            backgroundPosition: '0 0, 0 0, -40px -30px, calc(100% + 30px) calc(100% + 20px)',
-          }}
-        />
-
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-56 opacity-22"
-          style={{
-            backgroundImage: [
-              'radial-gradient(circle at 0% 15%, transparent 0 48px, rgba(245, 243, 231, 0.7) 48px 58px, transparent 58px 78px, rgba(145, 92, 29, 0.42) 78px 92px, transparent 92px 116px, rgba(86, 145, 116, 0.4) 116px 134px, transparent 134px)',
-              'radial-gradient(circle at 8% 62%, transparent 0 42px, rgba(245, 243, 231, 0.68) 42px 52px, transparent 52px 72px, rgba(124, 83, 170, 0.36) 72px 88px, transparent 88px 112px, rgba(201, 132, 54, 0.34) 112px 126px, transparent 126px)',
-            ].join(', '),
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'left -34px top 22px, left -28px bottom 28px',
-            filter: 'blur(0.2px)',
-          }}
-        />
-
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 right-0 w-56 opacity-16"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at 100% 28%, transparent 0 44px, rgba(245, 243, 231, 0.62) 44px 54px, transparent 54px 72px, rgba(124, 83, 170, 0.26) 72px 88px, transparent 88px 108px, rgba(201, 132, 54, 0.22) 108px 122px, transparent 122px)',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'right -30px top 64px',
+            backgroundSize: '84px 84px, 84px 84px, 84px 84px, 84px 84px, 100% 100%',
+            backgroundPosition: '0 0, 0 0, 0 0, 0 0, 0 0',
           }}
         />
 
