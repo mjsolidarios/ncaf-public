@@ -10,7 +10,7 @@ export function ProgramSection() {
       style={{ background: '#f6f3e7' }}
     >
       <div className="h-full w-full">
-        <FlipbookViewer pdfUrl={PROGRAM_PDF_URL} title="NCAF 2026 Festival Program" />
+        <FlipbookViewer pdfUrl={PROGRAM_PDF_URL} title="NCAF 2026 Festival Program | WVSU - CICT" />
       </div>
     </section>
   )

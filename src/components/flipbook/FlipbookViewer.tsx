@@ -32,8 +32,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 
 const PDFPageComponent = memo(forwardRef<
   HTMLDivElement,
-  { pageNumber: number; width: number; zoom: number }
->(({ pageNumber, width, zoom }, ref) => {
+  { pageNumber: number; width: number; zoom: number; isCover: boolean }
+>(({ pageNumber, width, zoom, isCover }, ref) => {
   const renderDevicePixelRatio = Math.min(
     MAX_RENDER_DEVICE_PIXEL_RATIO,
     (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) * zoom
@@ -44,7 +44,9 @@ const PDFPageComponent = memo(forwardRef<
     ref={ref}
     className="relative overflow-hidden bg-white"
     style={{
-      boxShadow:
+      boxShadow: isCover
+        ? 'none'
+        :
         pageNumber % 2 === 0
           ? '-6px 0 28px rgba(0,0,0,0.35)'
           : '6px 0 28px rgba(0,0,0,0.35)',
@@ -70,7 +72,8 @@ const PDFPageComponent = memo(forwardRef<
 }), (prevProps, nextProps) => (
   prevProps.pageNumber === nextProps.pageNumber &&
   prevProps.width === nextProps.width &&
-  prevProps.zoom === nextProps.zoom
+  prevProps.zoom === nextProps.zoom &&
+  prevProps.isCover === nextProps.isCover
 ))
 PDFPageComponent.displayName = 'PDFPage'
 
@@ -211,7 +214,13 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const pageHeight = Math.round((pageWidth * 297) / 210)
   const renderedPages = useMemo(
     () => Array.from({ length: numPages }, (_, i) => (
-      <PDFPageComponent key={i + 1} pageNumber={i + 1} width={pageWidth} zoom={zoom} />
+      <PDFPageComponent
+        key={i + 1}
+        pageNumber={i + 1}
+        width={pageWidth}
+        zoom={zoom}
+        isCover={i === 0 || i === numPages - 1}
+      />
     )),
     [numPages, pageWidth, zoom]
   )
@@ -220,6 +229,14 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const canGoNext = numPages > 0 && currentPage >= numPages - (isPortrait ? 1 : 2)
   const pageStart = numPages > 0 ? currentPage + 1 : 0
   const pageEnd = isPortrait ? pageStart : Math.min(currentPage + 2, numPages)
+  const isFrontCoverView = !isPortrait && currentPage === 0
+  const isBackCoverView = !isPortrait && numPages > 0 && currentPage >= numPages - 1
+  const isSingleCoverView = isFrontCoverView || isBackCoverView
+  const spreadOffsetX = isFrontCoverView
+    ? -(pageWidth * zoom) / 2
+    : isBackCoverView
+      ? (pageWidth * zoom) / 2
+      : 0
 
   return (
     <div
@@ -239,6 +256,46 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
           paddingBottom: isPortrait ? 20 : 28,
         }}
       >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-20"
+          style={{
+            backgroundImage: [
+              'repeating-linear-gradient(45deg, rgba(226, 179, 72, 0.16) 0 2px, transparent 2px 20px)',
+              'repeating-linear-gradient(-45deg, rgba(86, 145, 116, 0.12) 0 2px, transparent 2px 20px)',
+              'radial-gradient(circle at 18% 22%, rgba(248, 220, 142, 0.12) 0 10%, transparent 10% 100%)',
+              'radial-gradient(circle at 82% 78%, rgba(179, 113, 42, 0.1) 0 10%, transparent 10% 100%)',
+            ].join(', '),
+            backgroundSize: '48px 48px, 48px 48px, 220px 220px, 260px 260px',
+            backgroundPosition: '0 0, 0 0, -40px -30px, calc(100% + 30px) calc(100% + 20px)',
+          }}
+        />
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 w-56 opacity-22"
+          style={{
+            backgroundImage: [
+              'radial-gradient(circle at 0% 15%, transparent 0 48px, rgba(245, 243, 231, 0.7) 48px 58px, transparent 58px 78px, rgba(145, 92, 29, 0.42) 78px 92px, transparent 92px 116px, rgba(86, 145, 116, 0.4) 116px 134px, transparent 134px)',
+              'radial-gradient(circle at 8% 62%, transparent 0 42px, rgba(245, 243, 231, 0.68) 42px 52px, transparent 52px 72px, rgba(124, 83, 170, 0.36) 72px 88px, transparent 88px 112px, rgba(201, 132, 54, 0.34) 112px 126px, transparent 126px)',
+            ].join(', '),
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'left -34px top 22px, left -28px bottom 28px',
+            filter: 'blur(0.2px)',
+          }}
+        />
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 w-56 opacity-16"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 100% 28%, transparent 0 44px, rgba(245, 243, 231, 0.62) 44px 54px, transparent 54px 72px, rgba(124, 83, 170, 0.26) 72px 88px, transparent 88px 108px, rgba(201, 132, 54, 0.22) 108px 122px, transparent 122px)',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right -30px top 64px',
+          }}
+        />
+
         {/* Loading / error overlay */}
         {(loading || loadError) && (
           <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4">
@@ -304,8 +361,9 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
 
         {/* Flipbook */}
         <div
+          className="relative z-10"
           style={{
-            transform: `scale(${zoom})`,
+            transform: `translateX(${spreadOffsetX}px) scale(${zoom})`,
             transformOrigin: 'center',
             transition: 'transform 0.2s ease-out',
             willChange: 'transform',
@@ -330,7 +388,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
                 maxWidth={800}
                 minHeight={280}
                 maxHeight={1200}
-                drawShadow
+                drawShadow={!isSingleCoverView}
                 flippingTime={700}
                 usePortrait={isPortrait}
                 startZIndex={20}
@@ -340,7 +398,9 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
                 mobileScrollSupport
                 useMouseEvents
                 showPageCorners={!isPortrait}
-                className="shadow-[0_32px_80px_rgba(0,0,0,0.55)]"
+                className={cn(
+                  !isSingleCoverView && 'shadow-[0_32px_80px_rgba(0,0,0,0.55)]'
+                )}
                 onFlip={onFlip}
                 style={{}}
               >
