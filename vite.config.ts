@@ -9,6 +9,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'pdfjs-dist': path.resolve(__dirname, 'node_modules/react-pdf/node_modules/pdfjs-dist'),
     },
+  },
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
   },
 })

@@ -9,6 +9,7 @@ import {
 } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { Document, Page, pdfjs } from 'react-pdf'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import {
   BookOpen,
   ChevronLeft,
@@ -25,10 +26,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css'
 import { cn } from '@/lib/utils'
 import { Slider } from '@/components/ui/slider'
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'react-pdf/dist/pdf.worker.entry.js',
-  import.meta.url
-).toString()
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const PDFPageComponent = memo(forwardRef<
   HTMLDivElement,
