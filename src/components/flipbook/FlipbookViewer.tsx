@@ -30,8 +30,8 @@ pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 const PDFPageComponent = memo(forwardRef<
   HTMLDivElement,
-  { pageNumber: number; width: number; zoom: number; isCover: boolean }
->(({ pageNumber, width, zoom, isCover }, ref) => {
+  { pageNumber: number; width: number; zoom: number }
+>(({ pageNumber, width, zoom }, ref) => {
   const renderDevicePixelRatio = Math.min(
     MAX_RENDER_DEVICE_PIXEL_RATIO,
     (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) * zoom
@@ -41,14 +41,6 @@ const PDFPageComponent = memo(forwardRef<
   <div
     ref={ref}
     className="relative overflow-hidden bg-white"
-    style={{
-      boxShadow: isCover
-        ? 'none'
-        :
-        pageNumber % 2 === 0
-          ? '-6px 0 28px rgba(0,0,0,0.35)'
-          : '6px 0 28px rgba(0,0,0,0.35)',
-    }}
   >
     <Page
       pageNumber={pageNumber}
@@ -70,8 +62,7 @@ const PDFPageComponent = memo(forwardRef<
 }), (prevProps, nextProps) => (
   prevProps.pageNumber === nextProps.pageNumber &&
   prevProps.width === nextProps.width &&
-  prevProps.zoom === nextProps.zoom &&
-  prevProps.isCover === nextProps.isCover
+  prevProps.zoom === nextProps.zoom
 ))
 PDFPageComponent.displayName = 'PDFPage'
 
@@ -84,6 +75,7 @@ const MIN_ZOOM = 0.6
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.1
 const DEFAULT_ZOOM = 1
+const LARGE_SCREEN_INITIAL_ZOOM = 1.45
 const MAX_RENDER_DEVICE_PIXEL_RATIO = 5
 
 export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookViewerProps) {
@@ -92,9 +84,22 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [basePageWidth, setBasePageWidth] = useState(400)
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  const [zoom, setZoom] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 600
+      ? LARGE_SCREEN_INITIAL_ZOOM
+      : DEFAULT_ZOOM
+  )
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const panRef = useRef({ x: 0, y: 0 })
+  const zoomRef = useRef(zoom)
+  const dragRef = useRef<{
+    startX: number; startY: number
+    startPanX: number; startPanY: number
+    panning: boolean
+  } | null>(null)
 
   const bookRef = useRef<{
     pageFlip: () => { flipNext: () => void; flipPrev: () => void }
@@ -111,6 +116,7 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
       const portrait = w < 600
       if (prevPortrait !== null && prevPortrait !== portrait) {
         setCurrentPage(0)
+        setZoom(portrait ? DEFAULT_ZOOM : LARGE_SCREEN_INITIAL_ZOOM)
       }
       prevPortrait = portrait
       setIsPortrait(portrait)
@@ -153,6 +159,75 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
       containerRef.current.requestFullscreen().catch(() => {})
     } else {
       document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+
+  // Keep zoomRef in sync for use inside stable event handlers
+  useEffect(() => { zoomRef.current = zoom }, [zoom])
+
+  // Reset pan when zoom returns to/below 1
+  useEffect(() => {
+    if (zoom <= 1) {
+      panRef.current = { x: 0, y: 0 }
+      setPanOffset({ x: 0, y: 0 })
+    }
+  }, [zoom])
+
+  // Global mouse/touch handlers for panning (stable — uses refs only)
+  useEffect(() => {
+    const onMove = (clientX: number, clientY: number) => {
+      const drag = dragRef.current
+      if (!drag) return
+      const dx = clientX - drag.startX
+      const dy = clientY - drag.startY
+      if (!drag.panning && Math.hypot(dx, dy) > 4) {
+        drag.panning = true
+        setIsPanning(true)
+      }
+      if (drag.panning) {
+        const x = drag.startPanX + dx
+        const y = drag.startPanY + dy
+        panRef.current = { x, y }
+        setPanOffset({ x, y })
+      }
+    }
+    const onEnd = () => {
+      if (dragRef.current) { dragRef.current = null; setIsPanning(false) }
+    }
+    const onMouseMove = (e: MouseEvent) => onMove(e.clientX, e.clientY)
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current || e.touches.length !== 1) return
+      if (dragRef.current.panning) e.preventDefault()
+      onMove(e.touches[0].clientX, e.touches[0].clientY)
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onEnd)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend', onEnd)
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onEnd)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onEnd)
+    }
+  }, [])
+
+  const onPanStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (zoomRef.current <= 1) return
+    let clientX: number, clientY: number
+    if ('touches' in e) {
+      if (e.touches.length !== 1) return
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      if ((e as React.MouseEvent).button !== 0) return
+      clientX = (e as React.MouseEvent).clientX
+      clientY = (e as React.MouseEvent).clientY
+    }
+    dragRef.current = {
+      startX: clientX, startY: clientY,
+      startPanX: panRef.current.x, startPanY: panRef.current.y,
+      panning: false,
     }
   }, [])
 
@@ -217,7 +292,6 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
         pageNumber={i + 1}
         width={pageWidth}
         zoom={zoom}
-        isCover={i === 0 || i === numPages - 1}
       />
     )),
     [numPages, pageWidth, zoom]
@@ -337,12 +411,24 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
         <div
           className="relative z-10"
           style={{
-            transform: `translateX(${spreadOffsetX}px) scale(${zoom})`,
+            transform: `translate(${spreadOffsetX + panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
             transformOrigin: 'center',
-            transition: 'transform 0.2s ease-out',
+            transition: isPanning ? 'none' : 'transform 0.2s ease-out',
             willChange: 'transform',
           }}
         >
+          {/* Spine shadow — controlled by React state, disappears instantly on cover view */}
+          {!isSingleCoverView && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 left-1/2 z-[25] -translate-x-1/2"
+              style={{
+                width: 56,
+                background:
+                  'linear-gradient(to right, rgba(0,0,0,0.22) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.22) 100%)',
+              }}
+            />
+          )}
           <Document
             file={pdfUrl}
             onLoadSuccess={onDocumentLoadSuccess}
@@ -383,6 +469,18 @@ export function FlipbookViewer({ pdfUrl, title = 'Festival Program' }: FlipbookV
             )}
           </Document>
         </div>
+
+        {/* Pan overlay — captures pointer events for drag-pan when zoomed in,
+            sits above the book (z-[15]) but below nav buttons (z-20) */}
+        <div
+          className="absolute inset-0 z-[15]"
+          style={{
+            pointerEvents: zoom > 1 ? 'auto' : 'none',
+            cursor: isPanning ? 'grabbing' : zoom > 1 ? 'grab' : 'default',
+          }}
+          onMouseDown={onPanStart}
+          onTouchStart={onPanStart}
+        />
       </div>
 
       {/* ── Bottom toolbar ──────────────────────────────────────── */}
